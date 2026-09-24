@@ -1,0 +1,121 @@
+%% Powertrain inputs - choose one architecture
+% Run after parameter_initialisation_ship (eta_G, eta_S) and
+% parameter_initialisation_emissions (emission_param).
+%
+% This file prepares component data for three single-source architectures.
+% It does not change the optimizer. Required .mat files must be in the
+% current MATLAB folder or on its path.
+%
+% Sources for the efficiency and fuel-consumption curves:
+% [1] C. Candelo-Zuluaga, J.-R. Riba, and A. Garcia, "PMSM
+%     Torque-Speed-Efficiency Map Evaluation from Parameter Estimation
+%     Based on the Stand Still Test," Energies, vol. 14, no. 20,
+%     article 6804, 2021. doi:10.3390/en14206804.
+% [2] Wonder Electric, "IE5/IE4 Permanent Magnet Synchronous Motors:
+%     WST Series & WSTF Series," product catalogue, n.d.
+% [3] T. Kopka, A. Coraddu, and H. Polinder, "Optimal Energy Management
+%     of FC-Battery Shipboard Power System using Dynamic Programming,"
+%     ESARS-ITEC, pp. 1-6, 2024.
+%     doi:10.1109/ESARS-ITEC60450.2024.10819881.
+% [4] M. Li, H. Xu, W. Li, Y. Liu, F. Li, Y. Hu, and L. Liu, "The
+%     structure and control method of hybrid power source for electric
+%     vehicle," Energy, vol. 112, pp. 1273-1285, 2016.
+%     doi:10.1016/j.energy.2016.06.009.
+% [5] Caterpillar Inc., "3512C - SS Marine Propulsion Specifications,"
+%     manufacturer's specification sheet, 2009.
+% [6] D. Feroldi, M. Serra, and J. Riera, "Energy Management Strategies
+%     based on efficiency map for Fuel Cell Hybrid Vehicles," Journal
+%     of Power Sources, vol. 190, no. 2, pp. 387-401, 2009.
+%     doi:10.1016/j.jpowsour.2009.01.040.
+% [7] Ballard Power Systems Inc., "Fuel Cell Power Module for Marine
+%     Applications: FCwave 200 kW," product datasheet, 2024.
+
+powertrain.architecture = "ICE"; % "ICE", "FC-electric", "BAT-electric"
+
+% The 1120 kW engine rating is taken from the Caterpillar 3512C
+% specification [5]. The motor and battery ratings are use-case inputs;
+% check them against the equipment selected for another vessel.
+powertrain.ICE.rated_kW = 1120;
+powertrain.motor.rated_kW = 1120;
+powertrain.BAT.rated_kW = 1120;
+powertrain.inverter.rated_kW = powertrain.BAT.rated_kW;
+
+% Mechanical efficiencies are carried over from the current voyage
+% model. The fixed propulsion-inverter efficiency is separate from the
+% load-dependent battery-side converter curve loaded below.
+powertrain.ICE.mechanical_efficiency = eta_G * eta_S;
+powertrain.electric.mechanical_efficiency = eta_G * eta_S;
+powertrain.electric.propulsion_inverter_efficiency = 0.98;
+
+%% Internal combustion engine
+% The current ICE calculation uses the emissions workbook Fuelrate and
+% a load-dependent quadratic SFOC expression. The curve below is an
+% alternative: do not apply both SFOC models to the same fuel demand.
+%
+% This curve was extracted from manufacturer data for the Caterpillar
+% 3512C at fixed rated speed [5], representing generator operation.
+% Check its suitability before using it for a variable-speed direct ICE.
+powertrain.ICE.SFOC_base_g_per_kWh = emission_param.SFOC_base_g_per_kWh;
+powertrain.ICE.diesel_LHV_kWh_per_kg = 11.89;
+
+iceCurve = load('ICE_SFOC_curve.mat');
+powertrain.ICE.curve_load_percent = iceCurve.load_ICE(:);
+powertrain.ICE.curve_SFOC_g_per_kWh = iceCurve.bsfc_ICE(:);
+powertrain.ICE.diesel_LHV_kWh_per_kg = 11.89;
+
+%% Shared electric drive: permanent-magnet synchronous motor
+% A torque-speed-efficiency map was reconstructed using the standstill
+% parameter-estimation method in [1]. Efficiencies along the operating
+% curve of a fixed-pitch propeller were then extracted to obtain this
+% efficiency-versus-load curve. IE4 motor data [2] provide a comparison.
+motorCurve = load('PMSM_efficiency_curve.mat');
+powertrain.motor.load_percent = motorCurve.load_pct(:);
+powertrain.motor.efficiency = motorCurve.eff_frac(:);
+
+%% Battery-side converter
+% The load-dependent converter curve uses representative converter
+% efficiencies reported in [4]. It describes battery-side conversion
+% loss, separate from the fixed propulsion-inverter loss above.
+inverterCurve = load('Inverter_curve.mat');
+powertrain.inverter.load_fraction = inverterCurve.load(:);
+powertrain.inverter.efficiency = inverterCurve.efficiency(:);
+
+%% Fuel-cell electric
+% The efficiency-versus-load shape comes from [6]. A calibrated version
+% scales its peak to the 53.5% peak system efficiency specified for the
+% Ballard FCwave [7]. The selection below retains the unscaled eta_frac
+% column; select eta_frac_scaled if that is the calibrated version you
+% intend to use.
+fcCurve = load('PEMFC_efficiency_curve.mat');
+powertrain.FC.output_power_kW = fcCurve.P_kW(:);
+powertrain.FC.efficiency = fcCurve.eta_frac(:);
+powertrain.FC.rated_kW = max(powertrain.FC.output_power_kW);
+powertrain.FC.hydrogen_LHV_kWh_per_kg = 33.3;
+
+%% Battery electric
+% Battery efficiency was derived from the polarization curve in [3]
+% using an internal-resistance model. This curve is the SOC = 0.5 slice
+% of the resulting efficiency map. The selected slice does not impose
+% an initial SOC: this model does not track charging or battery state.
+batteryCurve = load('Battery_eff_curve.mat');
+powertrain.BAT.load_fraction = batteryCurve.load(:);
+powertrain.BAT.efficiency = batteryCurve.efficiency(:);
+powertrain.BAT.curve_SOC = batteryCurve.soc_value;
+
+%% Basic input checks
+assert(ismember(powertrain.architecture, ...
+    ["ICE", "FC-electric", "BAT-electric"]), ...
+    'Unknown powertrain architecture.');
+
+ratings = [powertrain.ICE.rated_kW, powertrain.motor.rated_kW, ...
+    powertrain.inverter.rated_kW, powertrain.FC.rated_kW, ...
+    powertrain.BAT.rated_kW];
+assert(all(isfinite(ratings) & ratings > 0), ...
+    'Component ratings must be positive.');
+
+assert(all(diff(powertrain.ICE.curve_load_percent) > 0) && ...
+    all(diff(powertrain.motor.load_percent) > 0) && ...
+    all(diff(powertrain.inverter.load_fraction) > 0) && ...
+    all(diff(powertrain.FC.output_power_kW) > 0) && ...
+    all(diff(powertrain.BAT.load_fraction) > 0), ...
+    'Each powertrain curve needs an increasing load or power axis.');

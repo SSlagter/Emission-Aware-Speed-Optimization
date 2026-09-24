@@ -1,0 +1,16 @@
+% Parameters relating to constraints
+TmaxN = 1;
+Tmax = ones(1,N)*22.5;                                                        % Define set of upper time window constraints here
+Tmin = zeros(1,N);                                                          % Define set of lower time window constraints here
+
+%Tmax = [10,20,25,35,40,50,65,70,73,80,90];
+%Tmin = [0,5,15,25,25,35,50,60,70,70,85];
+
+Tmin(end) = 0;
+safety_margin = 0.3;                                                        % Minimum clearance between ship and bottom
+
+% Speed upper and lower limits
+vog_lb = 5/3.6;
+vog_ub = 19/3.6;
+lb = max(-U_c,0);                                                           % So that vessel over ground is always at minimum zero
+ub = ones(1,N)*vog_ub;
