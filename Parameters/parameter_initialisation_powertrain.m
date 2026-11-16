@@ -30,7 +30,7 @@
 % [7] Ballard Power Systems Inc., "Fuel Cell Power Module for Marine
 %     Applications: FCwave 200 kW," product datasheet, 2024.
 
-powertrain.architecture = "ICE"; % "ICE", "FC-electric", "BAT-electric"
+powertrain.architecture = "BAT-electric"; % "ICE", "FC-electric", "BAT-electric"
 
 % The 1120 kW engine rating is taken from the Caterpillar 3512C
 % specification [5]. The motor and battery ratings are use-case inputs;
@@ -44,7 +44,7 @@ powertrain.inverter.rated_kW = powertrain.BAT.rated_kW;
 % model. The fixed propulsion-inverter efficiency is separate from the
 % load-dependent battery-side converter curve loaded below.
 powertrain.ICE.mechanical_efficiency = eta_G * eta_S;
-powertrain.electric.mechanical_efficiency = eta_G * eta_S;
+powertrain.electric.mechanical_efficiency = eta_S;
 powertrain.electric.propulsion_inverter_efficiency = 0.98;
 
 %% Internal combustion engine

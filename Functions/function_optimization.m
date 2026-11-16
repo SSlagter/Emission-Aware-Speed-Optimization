@@ -113,11 +113,34 @@ for z = 1:N
 
     % Propulsion power: resistance demand plus calibrated propeller load.
     % Tune the depth-efficiency relationship for a different vessel.
+    % Calibrated propulsive efficiency
     eta_D{z} = @(x) min(0.40 + 0.04 * ...
         (max(w_d(z), min_water_depth) - 3), 0.60);
-    P_E{z} = @(x) R_T{z}(x)*V_ow{z}(x)/1000;       % Effective power [kW]
-    P_resistance{z} = @(x) P_E{z}(x)/eta_D{z}(x);  % Resistance-based propeller power [kW]
-    P_D{z} = @(x) P_resistance{z}(x) + P_calib;    % Total propeller power [kW]
+    %eta_D{z} = @(x) min(0.325920 + 0.007494 * ...
+    %    (max(w_d(z), min_water_depth) - 3), 0.60); % calibration
+    %    associated without the 150kw power term.
+    
+    % Effective towing power [kW]
+    P_E{z} = @(x) ...
+        R_T{z}(x)*V_ow{z}(x)/1000;
+    
+    % The speed-power calibration was obtained from ICE engine
+    % load measurements, converted to engine output power.
+    %
+    % Therefore, the calibrated relationship represents
+    % ICE engine output, not propeller-delivered power.
+    
+    % Resistance-based contribution converted to propeller power
+    P_resistance{z} = @(x) ...
+        (P_E{z}(x)/eta_D{z}(x)) * ...
+        powertrain.ICE.mechanical_efficiency;
+    
+    % Total propeller power [kW]
+    % The calibrated 150 kW correction is also converted
+    % from ICE engine output to propeller power.
+    P_D{z} = @(x) ...
+        P_resistance{z}(x) + ...
+        P_calib * powertrain.ICE.mechanical_efficiency;
 
     if architecture == "ICE"
         % Engine output supplies propulsion and hotel demand.
@@ -193,10 +216,7 @@ for z = 1:N
                 powertrain.inverter.load_fraction(1)), ...
                 powertrain.inverter.load_fraction(end));
 
-            eta_inverter{z} = @(x) interp1( ...
-                powertrain.inverter.load_fraction, ...
-                powertrain.inverter.efficiency, ...
-                inverter_load{z}(x), 'pchip');
+            eta_inverter{z} = @(x) 0.98;
 
             P_source{z} = @(x) P_DC{z}(x) / ...
                 eta_inverter{z}(x);                    % Battery terminal [kW]
@@ -242,10 +262,61 @@ end
 % chemical energy.
 OBJ = @(x) E_trip{N}(x);
 
-% Enforce cumulative arrival windows and minimum under-keel clearance.
-% Speed-through-water bounds are supplied separately as lb and ub.
-nonlin = @(x) function_NLconstraints(x, N, t_trip, ...
-    Tmax, Tmin, w_d, safety_margin, T, squat);
+% Define powertrain component constraints
+power_constraints = {};
+
+for z = 1:N
+
+    switch architecture
+
+        case "ICE"
+
+            % Maximum engine output power
+            power_constraints{end+1} = @(x) ...
+                P_source{z}(x) - ...
+                powertrain.ICE.rated_kW;
+
+
+        case "FC-electric"
+
+            % Maximum motor mechanical power
+            power_constraints{end+1} = @(x) ...
+                P_motor{z}(x) - ...
+                powertrain.motor.rated_kW;
+
+            % Maximum fuel-cell electrical output
+            power_constraints{end+1} = @(x) ...
+                P_source{z}(x) - ...
+                powertrain.FC.rated_kW;
+
+
+        case "BAT-electric"
+
+            % Maximum motor mechanical power
+            power_constraints{end+1} = @(x) ...
+                P_motor{z}(x) - ...
+                powertrain.motor.rated_kW;
+
+            % Maximum battery-side converter output
+            power_constraints{end+1} = @(x) ...
+                P_DC{z}(x) - ...
+                powertrain.inverter.rated_kW;
+
+            % Maximum battery terminal power
+            power_constraints{end+1} = @(x) ...
+                P_source{z}(x) - ...
+                powertrain.BAT.rated_kW;
+
+    end
+
+end
+
+%% Nonlinear constraint function
+
+nonlin = @(x) function_NLconstraints( ...
+    x, N, t_trip, Tmax, Tmin, ...
+    w_d, safety_margin, T, squat, ...
+    power_constraints);
 
 %% Optimization
 % Solve from five starting points; ub is the initial point supplied to
@@ -261,7 +332,7 @@ problem = createOptimProblem('fmincon', ...
     'nonlcon', nonlin, 'options', options);
 
 ms = MultiStart;
-[x_opt, fval, exitflag, information] = run(ms, problem, 5);
+[x_opt, fval, exitflag, information] = run(ms, problem, 20);
 
 %% Output - used for reporting
 if isempty(x_opt)
@@ -359,7 +430,8 @@ for z = 1:N
         P_resistance{z}(x_opt) * sailing_time;
 
     out7.stage.calibration_propulsion_kWh(z) = ...
-        P_calib * sailing_time;
+    P_calib * powertrain.ICE.mechanical_efficiency ...
+    * sailing_time;
 
     out7.stage.propeller_kWh(z) = ...
         P_D{z}(x_opt) * sailing_time;

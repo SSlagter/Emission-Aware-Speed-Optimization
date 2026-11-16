@@ -7,7 +7,7 @@
 B = 11.4;                  % Moulded breadth [m]
 L = 110;                   % Waterline length [m]
 L_pp = 110;                % Length between perpendiculars [m]
-T = 2.75;                  % Mean draught [m]
+T = 3.00;                  % Mean draught [m]
 T_F = T;                   % Draught at forward perpendicular [m]
 T_A = T;                   % Draught at aft perpendicular [m]
 C_B = 0.85;                % Block coefficient [-]
@@ -17,7 +17,7 @@ A_BT = 0;                  % Transverse bulb area [m^2]; zero for no bulb
 h_B = 0.2 * T;             % Height of bulb-area centre above keel [m]
 A_T = 0.2 * B * T;         % Immersed transom area [m^2]
 C_stern = 0;               % Stern-shape parameter [-]
-D = 1.6;                   % Propeller diameter [m]
+D = 1.8;                   % Propeller diameter [m]
 Z = 4;                     % Number of propeller blades [-]
 S_app_factor = 0.05;       % Appendage wetted area as a fraction of hull area
 

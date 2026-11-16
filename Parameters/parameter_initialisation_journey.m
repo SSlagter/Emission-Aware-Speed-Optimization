@@ -1,7 +1,7 @@
 %% Input parameters - journey
 % Route, in upstream travel order from Rotterdam to Duisburg.
 % Each entry in d, w_d, and U_c describes the same route segment:
-%
+%       OLD
 %   1  Rotterdam         -> Dordrecht          39 km
 %   2  Dordrecht         -> Gorinchem          20 km
 %   3  Gorinchem         -> Tiel               42 km
@@ -10,8 +10,20 @@
 %   6  Nijmegen-b        -> Emmerich           30 km
 %   7  Emmerich          -> Wesel              35 km
 %   8  Wesel             -> Duisburg           33 km
+%   Total                                      235 km
+
+%       NEW
+%   1  Rotterdam         -> Alblasserdam       22.50 km
+%   2  Alblasserdam      -> Gorinchem          25.50 km
+%   3  Gorinchem         -> Tiel               44.50 km
+%   4  Tiel              -> Nijmegen           25.40 km
+%   5  Nijmegen          -> Emmerich           35.00 km
+%   6  Emmerich          -> Emmelson           38.36 km
+%   7  Emmelson          -> Duisburg           39.64 km
+%   Total                                      230.9 km
+
 %
-% Total modeled route distance is 235 km.
+% Total modeled route distance is 230.9 km.
 %
 % w_d and U_c are spatial averages of the available kilometre-level
 % water-depth and current data within each segment. They represent
@@ -20,16 +32,28 @@
 % values indicate an opposing current. The wrapper reverses segment
 % order and current sign when downstream travel is selected.
 
-d = [39000, 20000, 42000, 26000, 10000, 30000, 35000, 33000];
+
+%OLD
+%d = [39000, 20000, 42000, 26000, 10000, 30000, 35000, 33000];
                                                     % Segment distance [m]
 
-w_d = [8, 7.90142857142857, 7.70025582790698, 8.22218518518519, ...
-       8.09254545454545, 7.99548390322581, 8.35961113055556, ...
-       7.83464703235294];                          % Mean water depth [m]
+%w_d = [8, 7.90142857142857, 7.70025582790698, 8.22218518518519, ...
+%       8.09254545454545, 7.99548390322581, 8.35961113055556, ...
+%       7.83464703235294];                          % Mean water depth [m]
 
-U_c = [-0.19378925, -0.271610952380952, -1.09837581395349, ...
-       -0.922359259259259, -0.967033636363636, -1.24912983102919, ...
-       -1.46871031746032, -1.57700840336134];   % Mean current [m/s]
+%U_c = [-0.19378925, -0.271610952380952, -1.09837581395349, ...
+%       -0.922359259259259, -0.967033636363636, -1.24912983102919, ...
+%       -1.46871031746032, -1.57700840336134];   % Mean current [m/s]
+
+%NEW
+d = [22500, 25500, 44500, 25400, 35000, 38360, 39640]; % Segment distance [m]
+
+w_d = [7.5, 6.5, 4.5, 4.5, 4.5, 4.5, 4.5];          % Mean water depth [m]
+
+U_c = [-0.30, -0.50, -1, -1.2, -1.3, -1.7, -1.7];   % Mean current [m/s]
+
+
+
 
 N = numel(d);                                      % Number of segments
 
